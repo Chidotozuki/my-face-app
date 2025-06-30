@@ -3,7 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Camera, useCameraDevices } from 'react-native-vision-camera';
+import { Camera, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
+import { useFaceDetector } from 'react-native-vision-camera-face-detector';
+import { Worklets } from 'react-native-worklets-core';
 
 export default function FaceVerification() {
   const router = useRouter();
@@ -19,6 +21,30 @@ export default function FaceVerification() {
   const [storedFaces, setStoredFaces] = useState([]);
   const [verificationResult, setVerificationResult] = useState(null);
   const [verificationHistory, setVerificationHistory] = useState([]);
+  const [isFaceDetected, setIsFaceDetected] = useState(false);
+  const [detectedFaces, setDetectedFaces] = useState([]);
+
+  // Face detection options (customize as needed)
+  const faceDetectionOptions = useRef({
+    // Example: mode: 'accurate', detectLandmarks: true
+  }).current;
+  const { detectFaces } = useFaceDetector(faceDetectionOptions);
+
+  const handleDetectedFaces = Worklets.createRunOnJS((faces) => {
+    setIsFaceDetected(Array.isArray(faces) && faces.length > 0);
+    setDetectedFaces(faces);
+    console.log('faces detected', faces);
+  });
+
+  // Frame processor worklet for face detection
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet';
+    try {
+      const faces = detectFaces(frame);
+      handleDetectedFaces(faces);
+    } catch (err) {
+    }
+  }, [handleDetectedFaces]);
 
   // Request camera permission on component mount
   useEffect(() => {
@@ -56,9 +82,11 @@ export default function FaceVerification() {
   };
 
   const verifyFace = async () => {
-    if (!camera.current || isVerifying || storedFaces.length === 0) {
+    if (!camera.current || isVerifying || storedFaces.length === 0 || !isFaceDetected) {
       if (storedFaces.length === 0) {
         Alert.alert('No Faces', 'Please add some faces in the Face Collection screen first.');
+      } else if (!isFaceDetected) {
+        Alert.alert('No Face Detected', 'Please position a face in the frame.');
       }
       return;
     }
@@ -166,6 +194,7 @@ export default function FaceVerification() {
         device={device}
         isActive={true}
         photo={true}
+        frameProcessor={frameProcessor}
       />
 
       {/* Camera Overlay */}
@@ -191,10 +220,10 @@ export default function FaceVerification() {
             <TouchableOpacity 
               style={[
                 styles.verifyButton, 
-                (isVerifying || storedFaces.length === 0) && styles.verifyButtonDisabled
+                (!isFaceDetected || isVerifying || storedFaces.length === 0) && styles.verifyButtonDisabled
               ]}
               onPress={verifyFace}
-              disabled={isVerifying || storedFaces.length === 0}
+              disabled={!isFaceDetected || isVerifying || storedFaces.length === 0}
             >
               <Ionicons 
                 name={isVerifying ? "hourglass" : "checkmark-circle"} 

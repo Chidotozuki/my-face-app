@@ -16,7 +16,12 @@ import {
 import {
   Camera,
   useCameraDevices,
+  useFrameProcessor
 } from "react-native-vision-camera";
+import {
+  useFaceDetector
+} from "react-native-vision-camera-face-detector";
+import { Worklets } from "react-native-worklets-core";
 
 export default function FaceCollection() {
   const router = useRouter();
@@ -36,6 +41,41 @@ export default function FaceCollection() {
   const [currentFaceName, setCurrentFaceName] = useState("");
   const [showNameInput, setShowNameInput] = useState(false);
   const [lastCapturedImage, setLastCapturedImage] = useState(null);
+  const [isFaceDetected, setIsFaceDetected] = useState(false);
+
+  // Face detection options (customize as needed)
+  const faceDetectionOptions = useRef({
+    // Example: mode: 'accurate', detectLandmarks: true
+  }).current;
+  const { detectFaces } = useFaceDetector(faceDetectionOptions);
+
+
+  const detectFacesJs = Worklets.createRunOnJS((frame) => {
+    return detectFaces(frame);
+  });
+  
+  const [detectedFaces, setDetectedFaces] = useState([]);
+
+const handleDetectedFaces = Worklets.createRunOnJS((faces) => {
+  setIsFaceDetected(Array.isArray(faces) && faces.length > 0);
+  setDetectedFaces(faces); // store faces
+  console.log('faces detected', faces);
+});
+
+  
+
+  // Frame processor worklet for face detection
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet';
+  
+    try {
+      const faces = detectFaces(frame);
+      handleDetectedFaces(faces);
+    } catch (err) {
+      console.error('Frame Processor Error:', err);
+    }
+  }, [handleDetectedFaces]);
+  
 
   // Request camera permission on component mount
   React.useEffect(() => {
@@ -99,7 +139,7 @@ export default function FaceCollection() {
   console.log("_WORKLET:", global._WORKLET);
 
   const captureFace = async () => {
-    if (!camera.current || isCapturing) return;
+    if (!camera.current || isCapturing || !isFaceDetected) return;
     try {
       setIsCapturing(true);
       const photo = await camera.current.takePhoto({
@@ -226,6 +266,7 @@ export default function FaceCollection() {
         device={device}
         isActive={true}
         photo={true}
+        frameProcessor={frameProcessor}
       />
 
       {/* Camera Overlay */}
@@ -277,10 +318,10 @@ export default function FaceCollection() {
             <TouchableOpacity
               style={[
                 styles.captureButton,
-                isCapturing && styles.captureButtonDisabled,
+                (!isFaceDetected || isCapturing) && styles.captureButtonDisabled,
               ]}
               onPress={captureFace}
-              disabled={isCapturing}
+              disabled={!isFaceDetected || isCapturing}
             >
               <Ionicons name="camera" size={32} color="#fff" />
             </TouchableOpacity>

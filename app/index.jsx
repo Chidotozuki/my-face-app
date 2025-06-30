@@ -2,21 +2,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
   Dimensions,
-  LogBox,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 const { width, height } = Dimensions.get("window");
 
 export default function Index() {
   const router = useRouter();
-  LogBox.ignoreLogs(["_WORKLET"]);
+  // LogBox.ignoreLogs(["_WORKLET"]);
 
-  console.log("Hermes:", !!global.HermesInternal);
-  console.log("_WORKLET:", global._WORKLET);
+  // console.log("Hermes:", !!global.HermesInternal);
+  // console.log("_WORKLET:", global._WORKLET);
 
   return (
     <View style={styles.container}>
