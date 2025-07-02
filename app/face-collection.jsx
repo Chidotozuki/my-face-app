@@ -42,6 +42,8 @@ export default function FaceCollection() {
   const [showNameInput, setShowNameInput] = useState(false);
   const [lastCapturedImage, setLastCapturedImage] = useState(null);
   const [isFaceDetected, setIsFaceDetected] = useState(false);
+  const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
 
   // Face detection options (customize as needed)
   const faceDetectionOptions = useRef({
@@ -198,6 +200,16 @@ const handleDetectedFaces = Worklets.createRunOnJS((faces) => {
     loadSavedFaces();
   }, []);
 
+  // Set image size from device format (once device is available)
+  React.useEffect(() => {
+    if (device && device.photoFormats && device.photoFormats.length > 0) {
+      const format = device.photoFormats[0];
+      setImageSize({ width: format.width, height: format.height });
+    } else if (device && device.previewWidth && device.previewHeight) {
+      setImageSize({ width: device.previewWidth, height: device.previewHeight });
+    }
+  }, [device]);
+
   if (isRequestingPermission) {
     return (
       <SafeAreaView style={styles.permissionContainer}>
@@ -260,14 +272,55 @@ const handleDetectedFaces = Worklets.createRunOnJS((faces) => {
 
   return (
     <View style={styles.container}>
-      <Camera
-        ref={camera}
+      <View
         style={StyleSheet.absoluteFill}
-        device={device}
-        isActive={true}
-        photo={true}
-        frameProcessor={frameProcessor}
-      />
+        onLayout={e => {
+          const { width, height } = e.nativeEvent.layout;
+          setPreviewSize({ width, height });
+        }}
+      >
+        <Camera
+          ref={camera}
+          style={StyleSheet.absoluteFill}
+          device={device}
+          isActive={true}
+          photo={true}
+          frameProcessor={frameProcessor}
+        />
+        {/* Face Bounding Boxes Overlay */}
+        {detectedFaces.map((face, idx) => {
+          if (!face?.bounds) return null;
+          let left = face.bounds.x;
+          let top = face.bounds.y;
+          let width = face.bounds.width;
+          let height = face.bounds.height;
+          if (
+            imageSize.width && imageSize.height &&
+            previewSize.width && previewSize.height
+          ) {
+            const scaleX = previewSize.width / imageSize.width;
+            const scaleY = previewSize.height / imageSize.height;
+            left = face.bounds.x * scaleX;
+            top = face.bounds.y * scaleY;
+            width = face.bounds.width * scaleX;
+            height = face.bounds.height * scaleY;
+          }
+          return (
+            <View
+              key={idx}
+              pointerEvents="none"
+              style={[
+                styles.faceBox,
+                { left, top, width, height },
+              ]}
+            />
+          );
+        })}
+        {/* Debug overlay for detectedFaces */}
+        {/* <Text style={{ color: 'white', position: 'absolute', top: 40, left: 10, zIndex: 999, fontSize: 10, backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          {JSON.stringify(detectedFaces)}
+        </Text> */}
+      </View>
 
       {/* Camera Overlay */}
       <View style={styles.overlay}>
@@ -607,5 +660,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     textAlign: "center",
+  },
+  faceBox: {
+    position: 'absolute',
+    borderWidth: 3,
+    borderColor: 'lime',
+    borderRadius: 8,
+    zIndex: 100,
   },
 });

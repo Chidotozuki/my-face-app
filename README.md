@@ -48,3 +48,13 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Features
+
+- Accurate face bounding box overlay with proper scaling to match camera preview
+
+## Troubleshooting
+
+### Face bounding boxes are misaligned
+
+If the face bounding boxes do not align with faces in the camera preview, ensure you are scaling the face detection coordinates from the image size to the preview size. The app now measures the preview size and scales the bounding boxes accordingly for accurate alignment.
